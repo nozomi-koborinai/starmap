@@ -5,7 +5,10 @@ mod github;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "starmap", about = "Generate Awesome Lists from your GitHub Stars, organized by Lists")]
+#[command(
+    name = "starmap",
+    about = "Generate Awesome Lists from your GitHub Stars, organized by Lists"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
