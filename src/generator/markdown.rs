@@ -90,7 +90,13 @@ fn write_repo_line(out: &mut String, repo: &Repository) {
 fn to_anchor(name: &str) -> String {
     name.to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == ' ' { c } else { ' ' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == ' ' {
+                c
+            } else {
+                ' '
+            }
+        })
         .collect::<String>()
         .split_whitespace()
         .collect::<Vec<_>>()
@@ -107,8 +113,6 @@ mod tests {
             name_with_owner: name.to_string(),
             description: desc.map(|s| s.to_string()),
             url: format!("https://github.com/{name}"),
-            stargazer_count: 100,
-            primary_language: None,
         }
     }
 
@@ -137,9 +141,12 @@ mod tests {
         assert!(md.contains("- [Uncategorized](#uncategorized)"));
         assert!(md.contains("## Rust Tools"));
         assert!(md.contains("> Useful Rust tools"));
-        assert!(md.contains("[BurntSushi/ripgrep](https://github.com/BurntSushi/ripgrep) - Fast search"));
+        assert!(md
+            .contains("[BurntSushi/ripgrep](https://github.com/BurntSushi/ripgrep) - Fast search"));
         assert!(md.contains("## Uncategorized"));
-        assert!(md.contains("[astral-sh/uv](https://github.com/astral-sh/uv) - Python package manager"));
+        assert!(
+            md.contains("[astral-sh/uv](https://github.com/astral-sh/uv) - Python package manager")
+        );
     }
 
     #[test]
