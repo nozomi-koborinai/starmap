@@ -22,6 +22,8 @@ starmap is a Rust CLI tool that generates Awesome Lists from GitHub Stars, organ
 cargo run                              # show (stdout)
 cargo run -- export awesome-list.md    # export to file
 cargo run -- push --repo owner/name    # push to GitHub repo
+cargo run -- export-llms-txt llms.txt       # generate llmstxt.org index
+cargo run -- export-llms-full llms-full.md  # generate README archive (slow: fetches per repo)
 ```
 
 ## Development

@@ -44,6 +44,36 @@ Push directly to a GitHub repository:
 starmap push --repo owner/repo-name
 ```
 
+## Custom Category Order
+
+Create a `starmap.toml` at your repo root to control output order:
+
+```toml
+order = [
+  "🌱 Focus: Learning",
+  "🤖 AI Frameworks",
+  "🦾 Agent Tools",
+  # ...
+  "🎉 Other",
+]
+
+[llms_full]
+max_readme_size_kb = 10  # cap per repo (default: 10)
+```
+
+Lists not listed in `order` are appended at the end.
+
+## llms.txt and llms-full.md
+
+Generate AI-agent-friendly companion files:
+
+```sh
+starmap export-llms-txt llms.txt        # llmstxt.org-compliant index
+starmap export-llms-full llms-full.md   # full README archive (truncated per repo)
+```
+
+`llms-full.md` fetches each repo's README via REST; expect ~2 minutes for several hundred stars.
+
 ## GitHub Token
 
 starmap requires a GitHub token. Set it via environment variable or use `gh`:
@@ -81,12 +111,18 @@ jobs:
       - run: starmap export README.md
         env:
           GITHUB_TOKEN: ${{ secrets.STARMAP_PAT }}
+      - run: starmap export-llms-txt llms.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.STARMAP_PAT }}
+      - run: starmap export-llms-full llms-full.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.STARMAP_PAT }}
       - name: Commit if changed
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             git config user.name "starmap-bot"
             git config user.email "bot@users.noreply.github.com"
-            git add README.md
+            git add README.md llms.txt llms-full.md
             git commit -m "chore: update Awesome List"
             git push
           fi
