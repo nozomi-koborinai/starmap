@@ -37,6 +37,24 @@ impl Config {
     pub fn from_str(s: &str) -> Result<Self> {
         toml::from_str(s).context("Invalid starmap.toml")
     }
+
+    /// Load starmap.toml from the given directory (no traversal upward).
+    /// Returns Config::default() if the file does not exist.
+    pub fn load_from_dir(dir: &std::path::Path) -> Result<Self> {
+        let path = dir.join("starmap.toml");
+        if !path.exists() {
+            return Ok(Self::default());
+        }
+        let contents = std::fs::read_to_string(&path)
+            .with_context(|| format!("Failed to read {}", path.display()))?;
+        Self::from_str(&contents)
+    }
+
+    /// Convenience: load from the current working directory.
+    pub fn load() -> Result<Self> {
+        let cwd = std::env::current_dir().context("Failed to read current dir")?;
+        Self::load_from_dir(&cwd)
+    }
 }
 
 #[cfg(test)]
@@ -74,5 +92,20 @@ max_readme_size_kb = 20
     fn unknown_field_errors() {
         let result = Config::from_str(r#"unknown = "x""#);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_from_dir_finds_file() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("starmap.toml"), r#"order = ["X"]"#).unwrap();
+        let cfg = Config::load_from_dir(dir.path()).unwrap();
+        assert_eq!(cfg.order, vec!["X"]);
+    }
+
+    #[test]
+    fn load_from_dir_returns_default_when_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = Config::load_from_dir(dir.path()).unwrap();
+        assert!(cfg.order.is_empty());
     }
 }
