@@ -120,8 +120,8 @@ jobs:
       - name: Commit if changed
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
-            git config user.name "starmap-bot"
-            git config user.email "bot@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add README.md llms.txt llms-full.md
             git commit -m "chore: update Awesome List"
             git push
