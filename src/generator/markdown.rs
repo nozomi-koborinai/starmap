@@ -26,7 +26,7 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
         .iter()
         .filter_map(|l| {
             let display = focus_display_name(&l.name);
-            if display.trim().is_empty() {
+            if strip_emoji_prefix(&display).trim().is_empty() {
                 eprintln!(
                     "warning: Focus List with empty display name skipped: {:?}",
                     l.name
@@ -196,7 +196,7 @@ fn build_focus_index(focus_lists: &[&StarList]) -> HashMap<String, Vec<String>> 
     let mut index: HashMap<String, Vec<String>> = HashMap::new();
     for list in focus_lists {
         let display = focus_display_name(&list.name);
-        if display.trim().is_empty() {
+        if strip_emoji_prefix(&display).trim().is_empty() {
             continue;
         }
         for repo in &list.repositories {
@@ -334,7 +334,8 @@ mod tests {
 
     #[test]
     fn test_focus_display_name_bare_with_emoji() {
-        // After stripping, only "emoji + space" remains; trim() would yield empty.
+        // After stripping, only "emoji + space" remains. The validity gate strips the
+        // emoji prefix again to detect this as empty.
         assert_eq!(focus_display_name("🔥 Focus: "), "🔥 ");
     }
 
@@ -504,6 +505,38 @@ mod tests {
         }];
         let md = generate(&lists, &[]);
         assert!(!md.contains("## Focus\n"));
+    }
+
+    #[test]
+    fn test_build_focus_index_skips_emoji_only_bare_display() {
+        let f = StarList {
+            name: "🔥 Focus: ".to_string(),
+            description: None,
+            repositories: vec![make_repo("a/b", None)],
+        };
+        let index = build_focus_index(&[&f]);
+        assert!(
+            index.is_empty(),
+            "emoji-only bare Focus List should be skipped"
+        );
+    }
+
+    #[test]
+    fn test_generate_skips_emoji_only_bare_focus_list() {
+        let lists = vec![StarList {
+            name: "🔥 Focus: ".to_string(),
+            description: Some("ignored".to_string()),
+            repositories: vec![make_repo("a/b", Some("desc"))],
+        }];
+        let md = generate(&lists, &[make_repo("a/b", Some("desc"))]);
+
+        // No legend
+        assert!(!md.contains("## Focus\n"));
+        // No emoji-only tag rendered anywhere
+        assert!(!md.contains("`🔥 `"));
+        // Repo lands in Uncategorized with no tag
+        assert!(md.contains("## Uncategorized"));
+        assert!(md.contains("- [a/b](https://github.com/a/b) - desc\n"));
     }
 
     #[test]
