@@ -130,6 +130,10 @@ jobs:
 
 Add a classic Personal Access Token (with read access to your starred lists) as the `STARMAP_PAT` repo secret. The default `GITHUB_TOKEN` runs as `github-actions[bot]` and cannot see your stars.
 
+## Example
+
+See [koborin-ai/stars](https://github.com/koborin-ai/stars) for a live, auto-synced setup — `README.md`, `llms.txt`, and `llms-full.md` are all regenerated daily by starmap.
+
 ## License
 
 MIT
