@@ -4,7 +4,6 @@ use serde::Deserialize;
 
 /// Fetch README content via REST API. Returns Some(content) on success,
 /// None on 404 / unavailable, propagates other errors.
-#[allow(dead_code)]
 pub async fn fetch_readme(
     client: &reqwest::Client,
     token: &str,
@@ -49,7 +48,6 @@ pub async fn fetch_readme(
 }
 
 /// Truncate `s` to at most `max_bytes`, ending on a UTF-8 char boundary.
-#[allow(dead_code)]
 pub fn truncate_utf8(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {
         return s;

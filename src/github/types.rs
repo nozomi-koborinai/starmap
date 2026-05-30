@@ -16,11 +16,8 @@ pub struct Repository {
     pub name_with_owner: String,
     pub description: Option<String>,
     pub url: String,
-    #[allow(dead_code)]
     pub stargazer_count: Option<u64>,
-    #[allow(dead_code)]
     pub language: Option<String>,
-    #[allow(dead_code)]
     pub topics: Vec<String>,
 }
 

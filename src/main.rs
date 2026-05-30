@@ -33,6 +33,11 @@ enum Commands {
         /// Output file path
         path: String,
     },
+    /// Export an llms-full.md README archive of starred repos
+    ExportLlmsFull {
+        /// Output file path
+        path: String,
+    },
 }
 
 #[tokio::main]
@@ -44,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
         Some(Commands::Export { path }) => commands::export::run(&path).await?,
         Some(Commands::Push { repo }) => commands::push::run(&repo).await?,
         Some(Commands::ExportLlmsTxt { path }) => commands::export_llms_txt::run(&path).await?,
+        Some(Commands::ExportLlmsFull { path }) => commands::export_llms_full::run(&path).await?,
     }
 
     Ok(())

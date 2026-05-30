@@ -5,7 +5,6 @@ use crate::github::readme::truncate_utf8;
 use crate::github::types::{Repository, StarList};
 
 /// Render the llms-full archive. `readmes` maps `nameWithOwner` -> README content or None.
-#[allow(dead_code)]
 pub fn generate(
     title: &str,
     lists: &[StarList],

@@ -76,6 +76,11 @@ impl GitHubClient {
         Ok(repos)
     }
 
+    /// Expose the resolved token so REST helpers can authenticate.
+    pub fn token(&self) -> &str {
+        &self.token
+    }
+
     /// Fetch the authenticated user's login name
     pub async fn viewer_login(&self) -> Result<String> {
         #[derive(serde::Deserialize)]

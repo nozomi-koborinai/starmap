@@ -8,7 +8,6 @@ pub struct Config {
     #[serde(default)]
     pub order: Vec<String>,
     #[serde(default)]
-    #[allow(dead_code)] // used by llms-full command (Task 11)
     pub llms_full: LlmsFullConfig,
 }
 
@@ -16,7 +15,6 @@ pub struct Config {
 #[serde(deny_unknown_fields)]
 pub struct LlmsFullConfig {
     #[serde(default = "default_max_readme_size_kb")]
-    #[allow(dead_code)] // used by llms-full command (Task 11)
     pub max_readme_size_kb: usize,
 }
 
