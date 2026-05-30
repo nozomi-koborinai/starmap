@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::github::types::{Repository, StarList};
 
@@ -133,12 +133,33 @@ fn strip_emoji_prefix(name: &str) -> &str {
 ///   3. Re-attach the emoji prefix
 ///
 /// Callers should treat a trimmed-empty result as an invalid Focus List.
-#[allow(dead_code)]
 fn focus_display_name(name: &str) -> String {
     let rest = strip_emoji_prefix(name);
     let stripped = rest.strip_prefix("Focus: ").unwrap_or(rest);
     let emoji_part = &name[..name.len() - rest.len()];
     format!("{emoji_part}{stripped}")
+}
+
+/// Build a map from a repo's `name_with_owner` to the Focus display tags it carries.
+/// Tags appear in the order the Focus Lists are given in the input slice.
+/// Focus Lists with an empty display name (after `focus_display_name`) are silently
+/// skipped — the caller is responsible for surfacing a warning.
+#[allow(dead_code)]
+fn build_focus_index(focus_lists: &[&StarList]) -> HashMap<String, Vec<String>> {
+    let mut index: HashMap<String, Vec<String>> = HashMap::new();
+    for list in focus_lists {
+        let display = focus_display_name(&list.name);
+        if display.trim().is_empty() {
+            continue;
+        }
+        for repo in &list.repositories {
+            index
+                .entry(repo.name_with_owner.clone())
+                .or_default()
+                .push(display.clone());
+        }
+    }
+    index
 }
 
 #[cfg(test)]
@@ -273,5 +294,53 @@ mod tests {
     #[test]
     fn test_focus_display_name_bare_plain() {
         assert_eq!(focus_display_name("Focus: "), "");
+    }
+
+    #[test]
+    fn test_build_focus_index_single_list() {
+        let focus = StarList {
+            name: "🔥 Focus: In Production".to_string(),
+            description: None,
+            repositories: vec![make_repo("a/b", None), make_repo("c/d", None)],
+        };
+        let index = build_focus_index(&[&focus]);
+        assert_eq!(
+            index.get("a/b"),
+            Some(&vec!["🔥 In Production".to_string()])
+        );
+        assert_eq!(
+            index.get("c/d"),
+            Some(&vec!["🔥 In Production".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_build_focus_index_multiple_focus_definition_order() {
+        let f1 = StarList {
+            name: "Focus: A".to_string(),
+            description: None,
+            repositories: vec![make_repo("x/y", None)],
+        };
+        let f2 = StarList {
+            name: "Focus: B".to_string(),
+            description: None,
+            repositories: vec![make_repo("x/y", None)],
+        };
+        let index = build_focus_index(&[&f1, &f2]);
+        assert_eq!(
+            index.get("x/y"),
+            Some(&vec!["A".to_string(), "B".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_build_focus_index_skips_empty_display() {
+        let f = StarList {
+            name: "Focus: ".to_string(),
+            description: None,
+            repositories: vec![make_repo("x/y", None)],
+        };
+        let index = build_focus_index(&[&f]);
+        assert!(index.is_empty());
     }
 }
