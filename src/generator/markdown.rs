@@ -20,6 +20,37 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
         lists.iter().partition(|l| is_focus_list(&l.name));
     let focus_index = build_focus_index(&focus_lists);
 
+    // Collect valid focus lists (those with a non-empty display name).
+    // Emit a warning on stderr for invalid ones.
+    let valid_focus: Vec<(String, &StarList)> = focus_lists
+        .iter()
+        .filter_map(|l| {
+            let display = focus_display_name(&l.name);
+            if display.trim().is_empty() {
+                eprintln!(
+                    "warning: Focus List with empty display name skipped: {:?}",
+                    l.name
+                );
+                None
+            } else {
+                Some((display, *l))
+            }
+        })
+        .collect();
+
+    if !valid_focus.is_empty() {
+        out.push_str("## Focus\n\n");
+        for (display, list) in &valid_focus {
+            let desc = list.description.as_deref().unwrap_or("");
+            if desc.is_empty() {
+                out.push_str(&format!("- `{display}`\n"));
+            } else {
+                out.push_str(&format!("- `{display}` — {desc}\n"));
+            }
+        }
+        out.push('\n');
+    }
+
     // Uncategorized = repos that don't belong to any TOPIC list.
     // A repo that lives only in Focus Lists ends up here (with its Focus tags from Task 6).
     let listed_repos: HashSet<&str> = topic_lists
@@ -438,5 +469,56 @@ mod tests {
         assert!(!md.contains("## 🔥 Focus: In Production"));
         // Topic List section is still rendered
         assert!(md.contains("## 🤖 AI Frameworks"));
+    }
+
+    #[test]
+    fn test_generate_emits_focus_legend_with_description() {
+        let lists = vec![StarList {
+            name: "🔥 Focus: In Production".to_string(),
+            description: Some("業務で使用中".to_string()),
+            repositories: vec![],
+        }];
+        let md = generate(&lists, &[]);
+        assert!(md.contains("## Focus"));
+        assert!(md.contains("- `🔥 In Production` — 業務で使用中"));
+    }
+
+    #[test]
+    fn test_generate_focus_legend_omits_dash_when_description_empty() {
+        let lists = vec![StarList {
+            name: "🔥 Focus: In Production".to_string(),
+            description: None,
+            repositories: vec![],
+        }];
+        let md = generate(&lists, &[]);
+        assert!(md.contains("- `🔥 In Production`\n"));
+        assert!(!md.contains("- `🔥 In Production` —"));
+    }
+
+    #[test]
+    fn test_generate_no_focus_legend_when_zero_focus_lists() {
+        let lists = vec![StarList {
+            name: "🤖 AI Frameworks".to_string(),
+            description: None,
+            repositories: vec![],
+        }];
+        let md = generate(&lists, &[]);
+        assert!(!md.contains("## Focus\n"));
+    }
+
+    #[test]
+    fn test_generate_skips_focus_list_with_empty_display_name() {
+        let lists = vec![StarList {
+            name: "Focus: ".to_string(), // bare prefix, no display name
+            description: None,
+            repositories: vec![make_repo("a/b", Some("desc"))],
+        }];
+        let md = generate(&lists, &[make_repo("a/b", Some("desc"))]);
+
+        // No legend section is emitted (no valid focus entries)
+        assert!(!md.contains("## Focus\n"));
+        // The repo lands in Uncategorized without a tag (the bad list contributed nothing)
+        assert!(md.contains("## Uncategorized"));
+        assert!(md.contains("- [a/b](https://github.com/a/b) - desc\n"));
     }
 }
