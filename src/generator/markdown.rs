@@ -103,6 +103,31 @@ fn to_anchor(name: &str) -> String {
         .join("-")
 }
 
+/// Return true when the list name designates a Focus List.
+/// A Focus List name starts with `Focus: ` (capital F, colon, space),
+/// optionally preceded by an emoji prefix (single non-ASCII char + ASCII space).
+#[allow(dead_code)]
+fn is_focus_list(name: &str) -> bool {
+    strip_emoji_prefix(name).starts_with("Focus: ")
+}
+
+/// If `name` starts with a non-ASCII character followed by an ASCII space,
+/// return the remainder after that space. Otherwise return `name` unchanged.
+#[allow(dead_code)]
+fn strip_emoji_prefix(name: &str) -> &str {
+    let mut chars = name.char_indices();
+    let Some((_, first)) = chars.next() else {
+        return name;
+    };
+    if first.is_ascii() {
+        return name;
+    }
+    let Some((idx, ' ')) = chars.next() else {
+        return name;
+    };
+    &name[idx + 1..]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -179,5 +204,37 @@ mod tests {
         let pos_a = md.find("aaa/repo").unwrap();
         let pos_z = md.find("zzz/repo").unwrap();
         assert!(pos_a < pos_z);
+    }
+
+    #[test]
+    fn test_is_focus_list_plain_prefix() {
+        assert!(is_focus_list("Focus: In Production"));
+    }
+
+    #[test]
+    fn test_is_focus_list_with_emoji_prefix() {
+        assert!(is_focus_list("🔥 Focus: In Production"));
+    }
+
+    #[test]
+    fn test_is_focus_list_lowercase_is_topic() {
+        assert!(!is_focus_list("focus: In Production"));
+    }
+
+    #[test]
+    fn test_is_focus_list_no_colon_is_topic() {
+        assert!(!is_focus_list("Focus In Production"));
+    }
+
+    #[test]
+    fn test_is_focus_list_plain_topic() {
+        assert!(!is_focus_list("🤖 AI Frameworks"));
+    }
+
+    #[test]
+    fn test_is_focus_list_bare_prefix_is_focus() {
+        // Bare "Focus: " (no display name) is still detected as focus.
+        // The caller (legend emission) is responsible for filtering empty-display lists.
+        assert!(is_focus_list("Focus: "));
     }
 }
