@@ -10,11 +10,11 @@ pub async fn run(repo: &str) -> anyhow::Result<()> {
         .context("Invalid repo format. Expected owner/name")?;
 
     // Generate markdown
+    let config = crate::config::Config::load()?;
     let client = GitHubClient::new()?;
     let star_lists = client.fetch_star_lists().await?;
     let all_starred = client.fetch_all_starred().await?;
-    let markdown =
-        generator::markdown::generate(&star_lists, &all_starred, &crate::config::Config::default());
+    let markdown = generator::markdown::generate(&star_lists, &all_starred, &config);
 
     // Push to GitHub
     let token = resolve_token()?;
