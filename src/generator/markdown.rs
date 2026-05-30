@@ -554,4 +554,69 @@ mod tests {
         assert!(md.contains("## Uncategorized"));
         assert!(md.contains("- [a/b](https://github.com/a/b) - desc\n"));
     }
+
+    #[test]
+    fn test_generate_full_flow_with_focus() {
+        let lists = vec![
+            StarList {
+                name: "🤖 AI Frameworks".to_string(),
+                description: Some("LLM SDKs and frameworks".to_string()),
+                repositories: vec![
+                    make_repo("anthropics/anthropic-sdk-python", Some("Anthropic SDK")),
+                    make_repo("langchain-ai/langgraph", Some("Resilient agents")),
+                ],
+            },
+            StarList {
+                name: "🔥 Focus: In Production".to_string(),
+                description: Some("業務 / 個人開発で実際に使ってる".to_string()),
+                repositories: vec![make_repo("anthropics/anthropic-sdk-python", None)],
+            },
+            StarList {
+                name: "🌱 Focus: Watching".to_string(),
+                description: Some("試したい・気になってる".to_string()),
+                repositories: vec![
+                    make_repo("anthropics/anthropic-sdk-python", None),
+                    make_repo("langchain-ai/langgraph", None),
+                ],
+            },
+        ];
+        let all = vec![
+            make_repo("anthropics/anthropic-sdk-python", Some("Anthropic SDK")),
+            make_repo("langchain-ai/langgraph", Some("Resilient agents")),
+            make_repo("orphan/repo", Some("Lonely")),
+        ];
+
+        let md = generate(&lists, &all);
+
+        // Legend
+        assert!(md.contains("## Focus\n"));
+        assert!(md.contains("- `🔥 In Production` — 業務 / 個人開発で実際に使ってる"));
+        assert!(md.contains("- `🌱 Watching` — 試したい・気になってる"));
+
+        // TOC excludes Focus
+        assert!(md.contains("- [🤖 AI Frameworks]"));
+        assert!(!md.contains("- [🔥 Focus: In Production]"));
+        assert!(!md.contains("- [🌱 Focus: Watching]"));
+        assert!(md.contains("- [Uncategorized](#uncategorized)"));
+
+        // Topic section
+        assert!(md.contains("## 🤖 AI Frameworks"));
+        assert!(md.contains("> LLM SDKs and frameworks"));
+        // anthropics/anthropic-sdk-python: in BOTH focus lists → tags in definition order
+        assert!(md.contains(
+            "- [anthropics/anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python) - Anthropic SDK `🔥 In Production` `🌱 Watching`"
+        ));
+        // langchain-ai/langgraph: in Watching only
+        assert!(md.contains(
+            "- [langchain-ai/langgraph](https://github.com/langchain-ai/langgraph) - Resilient agents `🌱 Watching`"
+        ));
+
+        // No focus section header
+        assert!(!md.contains("## 🔥 Focus: In Production"));
+        assert!(!md.contains("## 🌱 Focus: Watching"));
+
+        // Uncategorized
+        assert!(md.contains("## Uncategorized"));
+        assert!(md.contains("- [orphan/repo](https://github.com/orphan/repo) - Lonely\n"));
+    }
 }
