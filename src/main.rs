@@ -28,6 +28,11 @@ enum Commands {
         #[arg(long)]
         repo: String,
     },
+    /// Export an llms.txt index of starred repos
+    ExportLlmsTxt {
+        /// Output file path
+        path: String,
+    },
 }
 
 #[tokio::main]
@@ -38,6 +43,7 @@ async fn main() -> anyhow::Result<()> {
         None => commands::show::run().await?,
         Some(Commands::Export { path }) => commands::export::run(&path).await?,
         Some(Commands::Push { repo }) => commands::push::run(&repo).await?,
+        Some(Commands::ExportLlmsTxt { path }) => commands::export_llms_txt::run(&path).await?,
     }
 
     Ok(())

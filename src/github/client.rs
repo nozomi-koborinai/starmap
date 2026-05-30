@@ -76,6 +76,20 @@ impl GitHubClient {
         Ok(repos)
     }
 
+    /// Fetch the authenticated user's login name
+    pub async fn viewer_login(&self) -> Result<String> {
+        #[derive(serde::Deserialize)]
+        struct Data {
+            viewer: Viewer,
+        }
+        #[derive(serde::Deserialize)]
+        struct Viewer {
+            login: String,
+        }
+        let data: Data = self.execute_query("{ viewer { login } }").await?;
+        Ok(data.viewer.login)
+    }
+
     /// Fetch remaining pages of items within a list
     async fn fetch_remaining_list_items(
         &self,

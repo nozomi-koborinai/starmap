@@ -2,7 +2,6 @@ use crate::config::Config;
 use crate::github::types::{Repository, StarList};
 
 /// Generate llmstxt.org-compliant index of starred repos.
-#[allow(dead_code)]
 pub fn generate(title: &str, lists: &[StarList], config: &Config) -> String {
     let mut out = String::new();
     out.push_str(&format!("# {title}\n\n"));
