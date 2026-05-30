@@ -259,6 +259,9 @@ mod tests {
             name_with_owner: name.to_string(),
             description: desc.map(|s| s.to_string()),
             url: format!("https://github.com/{name}"),
+            stargazer_count: None,
+            language: None,
+            topics: vec![],
         }
     }
 

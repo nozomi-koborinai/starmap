@@ -212,6 +212,11 @@ fn build_starred_query(cursor: &Option<String>) -> String {
         nameWithOwner
         description
         url
+        stargazerCount
+        primaryLanguage {{ name }}
+        repositoryTopics(first: 10) {{
+          nodes {{ topic {{ name }} }}
+        }}
       }}
       pageInfo {{ hasNextPage endCursor }}
     }}

@@ -16,6 +16,12 @@ pub struct Repository {
     pub name_with_owner: String,
     pub description: Option<String>,
     pub url: String,
+    #[allow(dead_code)]
+    pub stargazer_count: Option<u64>,
+    #[allow(dead_code)]
+    pub language: Option<String>,
+    #[allow(dead_code)]
+    pub topics: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -97,6 +103,32 @@ pub struct RawRepository {
     pub name_with_owner: String,
     pub description: Option<String>,
     pub url: String,
+    #[serde(default)]
+    pub stargazer_count: Option<u64>,
+    #[serde(default)]
+    pub primary_language: Option<RawLanguage>,
+    #[serde(default)]
+    pub repository_topics: Option<RawTopics>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawLanguage {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawTopics {
+    pub nodes: Vec<RawTopicNode>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawTopicNode {
+    pub topic: RawTopicName,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawTopicName {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -116,6 +148,12 @@ impl From<RawRepository> for Repository {
             name_with_owner: raw.name_with_owner,
             description: raw.description,
             url: raw.url,
+            stargazer_count: raw.stargazer_count,
+            language: raw.primary_language.map(|l| l.name),
+            topics: raw
+                .repository_topics
+                .map(|t| t.nodes.into_iter().map(|n| n.topic.name).collect())
+                .unwrap_or_default(),
         }
     }
 }
