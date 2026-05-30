@@ -8,7 +8,11 @@ use crate::github::types::{Repository, StarList};
 /// `all_starred` — All starred repositories (regardless of list membership)
 ///
 /// Stars not belonging to any list are grouped under an "Uncategorized" section.
-pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
+pub fn generate(
+    lists: &[StarList],
+    all_starred: &[Repository],
+    config: &crate::config::Config,
+) -> String {
     let mut out = String::new();
 
     // Header
@@ -19,6 +23,9 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
     let (focus_lists, topic_lists): (Vec<&StarList>, Vec<&StarList>) =
         lists.iter().partition(|l| is_focus_list(&l.name));
     let focus_index = build_focus_index(&focus_lists);
+
+    // Apply config.order to topic lists.
+    let topic_lists = apply_order(topic_lists, &config.order);
 
     // Collect valid focus lists (those with a non-empty display name).
     // Emit a warning on stderr for invalid ones.
@@ -209,6 +216,39 @@ fn build_focus_index(focus_lists: &[&StarList]) -> HashMap<String, Vec<String>> 
     index
 }
 
+/// Reorder `topic_lists` according to `order`.
+/// Lists named in `order` appear first (in that order); remaining lists are
+/// appended at the end in their original input order, with a stderr warning.
+fn apply_order<'a>(topic_lists: Vec<&'a StarList>, order: &[String]) -> Vec<&'a StarList> {
+    if order.is_empty() {
+        return topic_lists;
+    }
+    let mut remaining: HashMap<&str, &StarList> =
+        topic_lists.iter().map(|l| (l.name.as_str(), *l)).collect();
+    let mut ordered: Vec<&StarList> = Vec::with_capacity(topic_lists.len());
+    for name in order {
+        if let Some(l) = remaining.remove(name.as_str()) {
+            ordered.push(l);
+        }
+    }
+    // Warn for lists present on GitHub but missing from config.
+    for list in &topic_lists {
+        if remaining.contains_key(list.name.as_str()) {
+            eprintln!(
+                "warning: list \"{}\" is not in starmap.toml order; appended at end",
+                list.name
+            );
+        }
+    }
+    // Append remaining (preserving original order).
+    for list in topic_lists {
+        if remaining.contains_key(list.name.as_str()) {
+            ordered.push(list);
+        }
+    }
+    ordered
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,7 +279,7 @@ mod tests {
             make_repo("astral-sh/uv", Some("Python package manager")),
         ];
 
-        let md = generate(&lists, &all_starred);
+        let md = generate(&lists, &all_starred, &crate::config::Config::default());
 
         assert!(md.contains("# Awesome Stars"));
         assert!(md.contains("## Contents"));
@@ -265,7 +305,7 @@ mod tests {
 
         let all_starred = vec![make_repo("owner/repo", Some("desc"))];
 
-        let md = generate(&lists, &all_starred);
+        let md = generate(&lists, &all_starred, &crate::config::Config::default());
 
         assert!(!md.contains("Uncategorized"));
     }
@@ -281,7 +321,7 @@ mod tests {
             ],
         }];
 
-        let md = generate(&lists, &[]);
+        let md = generate(&lists, &[], &crate::config::Config::default());
         let pos_a = md.find("aaa/repo").unwrap();
         let pos_z = md.find("zzz/repo").unwrap();
         assert!(pos_a < pos_z);
@@ -426,7 +466,11 @@ mod tests {
                 repositories: vec![make_repo("a/b", None)],
             },
         ];
-        let md = generate(&lists, &[make_repo("a/b", Some("desc"))]);
+        let md = generate(
+            &lists,
+            &[make_repo("a/b", Some("desc"))],
+            &crate::config::Config::default(),
+        );
         assert!(md.contains("- [a/b](https://github.com/a/b) - desc `🔥 In Production`"));
     }
 
@@ -438,7 +482,7 @@ mod tests {
             repositories: vec![make_repo("orphan/repo", None)],
         }];
         let all = vec![make_repo("orphan/repo", Some("orphan desc"))];
-        let md = generate(&lists, &all);
+        let md = generate(&lists, &all, &crate::config::Config::default());
 
         // orphan/repo is in a Focus List but no topic List → Uncategorized with tag
         assert!(md.contains("## Uncategorized"));
@@ -462,7 +506,7 @@ mod tests {
             },
         ];
         let all = vec![make_repo("anthropics/sdk", Some("SDK"))];
-        let md = generate(&lists, &all);
+        let md = generate(&lists, &all, &crate::config::Config::default());
 
         // Focus List must NOT appear in TOC
         assert!(!md.contains("- [🔥 Focus: In Production]"));
@@ -479,7 +523,7 @@ mod tests {
             description: Some("業務で使用中".to_string()),
             repositories: vec![],
         }];
-        let md = generate(&lists, &[]);
+        let md = generate(&lists, &[], &crate::config::Config::default());
         assert!(md.contains("## Focus"));
         assert!(md.contains("- `🔥 In Production` — 業務で使用中"));
     }
@@ -491,7 +535,7 @@ mod tests {
             description: None,
             repositories: vec![],
         }];
-        let md = generate(&lists, &[]);
+        let md = generate(&lists, &[], &crate::config::Config::default());
         assert!(md.contains("- `🔥 In Production`\n"));
         assert!(!md.contains("- `🔥 In Production` —"));
     }
@@ -503,7 +547,7 @@ mod tests {
             description: None,
             repositories: vec![],
         }];
-        let md = generate(&lists, &[]);
+        let md = generate(&lists, &[], &crate::config::Config::default());
         assert!(!md.contains("## Focus\n"));
     }
 
@@ -528,7 +572,11 @@ mod tests {
             description: Some("ignored".to_string()),
             repositories: vec![make_repo("a/b", Some("desc"))],
         }];
-        let md = generate(&lists, &[make_repo("a/b", Some("desc"))]);
+        let md = generate(
+            &lists,
+            &[make_repo("a/b", Some("desc"))],
+            &crate::config::Config::default(),
+        );
 
         // No legend
         assert!(!md.contains("## Focus\n"));
@@ -546,13 +594,69 @@ mod tests {
             description: None,
             repositories: vec![make_repo("a/b", Some("desc"))],
         }];
-        let md = generate(&lists, &[make_repo("a/b", Some("desc"))]);
+        let md = generate(
+            &lists,
+            &[make_repo("a/b", Some("desc"))],
+            &crate::config::Config::default(),
+        );
 
         // No legend section is emitted (no valid focus entries)
         assert!(!md.contains("## Focus\n"));
         // The repo lands in Uncategorized without a tag (the bad list contributed nothing)
         assert!(md.contains("## Uncategorized"));
         assert!(md.contains("- [a/b](https://github.com/a/b) - desc\n"));
+    }
+
+    #[test]
+    fn generate_respects_config_order() {
+        let lists = vec![
+            StarList {
+                name: "B".into(),
+                description: None,
+                repositories: vec![],
+            },
+            StarList {
+                name: "A".into(),
+                description: None,
+                repositories: vec![],
+            },
+            StarList {
+                name: "C".into(),
+                description: None,
+                repositories: vec![],
+            },
+        ];
+        let cfg = crate::config::Config {
+            order: vec!["A".into(), "C".into()],
+            ..Default::default()
+        };
+        let out = generate(&lists, &[], &cfg);
+        // A first, C second, B (not in config) appended last.
+        // Use "\n## X\n" to avoid matching "## Contents" for the "C" case.
+        let pos_a = out.find("\n## A\n").unwrap();
+        let pos_c = out.find("\n## C\n").unwrap();
+        let pos_b = out.find("\n## B\n").unwrap();
+        assert!(pos_a < pos_c && pos_c < pos_b);
+    }
+
+    #[test]
+    fn generate_no_config_keeps_input_order() {
+        let lists = vec![
+            StarList {
+                name: "First".into(),
+                description: None,
+                repositories: vec![],
+            },
+            StarList {
+                name: "Second".into(),
+                description: None,
+                repositories: vec![],
+            },
+        ];
+        let out = generate(&lists, &[], &crate::config::Config::default());
+        let pos_first = out.find("## First").unwrap();
+        let pos_second = out.find("## Second").unwrap();
+        assert!(pos_first < pos_second);
     }
 
     #[test]
@@ -586,7 +690,7 @@ mod tests {
             make_repo("orphan/repo", Some("Lonely")),
         ];
 
-        let md = generate(&lists, &all);
+        let md = generate(&lists, &all, &crate::config::Config::default());
 
         // Legend
         assert!(md.contains("## Focus\n"));
