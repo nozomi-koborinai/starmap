@@ -15,8 +15,14 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
     out.push_str("# Awesome Stars\n\n");
     out.push_str("> A curated list of my GitHub stars, organized by lists.\n\n");
 
-    // Compute uncategorized stars
-    let listed_repos: HashSet<&str> = lists
+    // Partition: Focus Lists are tagged inline, topic lists become sections.
+    // `_focus_lists` is wired up in Task 6 (build_focus_index) and Task 7 (legend).
+    let (_focus_lists, topic_lists): (Vec<&StarList>, Vec<&StarList>) =
+        lists.iter().partition(|l| is_focus_list(&l.name));
+
+    // Uncategorized = repos that don't belong to any TOPIC list.
+    // A repo that lives only in Focus Lists ends up here (with its Focus tags from Task 6).
+    let listed_repos: HashSet<&str> = topic_lists
         .iter()
         .flat_map(|l| l.repositories.iter())
         .map(|r| r.name_with_owner.as_str())
@@ -32,9 +38,9 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
             .cmp(&b.name_with_owner.to_lowercase())
     });
 
-    // Contents (TOC)
+    // Contents (TOC) — topic lists only
     out.push_str("## Contents\n\n");
-    for list in lists {
+    for list in &topic_lists {
         let anchor = to_anchor(&list.name);
         out.push_str(&format!("- [{}](#{})\n", list.name, anchor));
     }
@@ -43,8 +49,8 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
     }
     out.push('\n');
 
-    // List sections
-    for list in lists {
+    // Topic sections only
+    for list in &topic_lists {
         out.push_str(&format!("## {}\n\n", list.name));
         if let Some(desc) = &list.description {
             if !desc.is_empty() {
@@ -110,7 +116,6 @@ fn to_anchor(name: &str) -> String {
 /// Return true when the list name designates a Focus List.
 /// A Focus List name starts with `Focus: ` (capital F, colon, space),
 /// optionally preceded by an emoji prefix (single non-ASCII char + ASCII space).
-#[allow(dead_code)]
 fn is_focus_list(name: &str) -> bool {
     strip_emoji_prefix(name).starts_with("Focus: ")
 }
@@ -366,5 +371,30 @@ mod tests {
             out,
             "- [a/b](https://github.com/a/b) - desc `🔥 In Production` `🌱 Watching`\n"
         );
+    }
+
+    #[test]
+    fn test_generate_excludes_focus_from_toc_and_sections() {
+        let lists = vec![
+            StarList {
+                name: "🤖 AI Frameworks".to_string(),
+                description: None,
+                repositories: vec![make_repo("anthropics/sdk", Some("SDK"))],
+            },
+            StarList {
+                name: "🔥 Focus: In Production".to_string(),
+                description: None,
+                repositories: vec![make_repo("anthropics/sdk", None)],
+            },
+        ];
+        let all = vec![make_repo("anthropics/sdk", Some("SDK"))];
+        let md = generate(&lists, &all);
+
+        // Focus List must NOT appear in TOC
+        assert!(!md.contains("- [🔥 Focus: In Production]"));
+        // Focus List must NOT have its own section header
+        assert!(!md.contains("## 🔥 Focus: In Production"));
+        // Topic List section is still rendered
+        assert!(md.contains("## 🤖 AI Frameworks"));
     }
 }
