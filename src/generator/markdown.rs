@@ -113,7 +113,6 @@ fn is_focus_list(name: &str) -> bool {
 
 /// If `name` starts with a non-ASCII character followed by an ASCII space,
 /// return the remainder after that space. Otherwise return `name` unchanged.
-#[allow(dead_code)]
 fn strip_emoji_prefix(name: &str) -> &str {
     let mut chars = name.char_indices();
     let Some((_, first)) = chars.next() else {
@@ -126,6 +125,20 @@ fn strip_emoji_prefix(name: &str) -> &str {
         return name;
     };
     &name[idx + 1..]
+}
+
+/// Build the display name for a Focus List:
+///   1. Slice off the emoji prefix (if present)
+///   2. Strip the leading `Focus: ` from the remainder
+///   3. Re-attach the emoji prefix
+///
+/// Callers should treat a trimmed-empty result as an invalid Focus List.
+#[allow(dead_code)]
+fn focus_display_name(name: &str) -> String {
+    let rest = strip_emoji_prefix(name);
+    let stripped = rest.strip_prefix("Focus: ").unwrap_or(rest);
+    let emoji_part = &name[..name.len() - rest.len()];
+    format!("{emoji_part}{stripped}")
 }
 
 #[cfg(test)]
@@ -236,5 +249,29 @@ mod tests {
         // Bare "Focus: " (no display name) is still detected as focus.
         // The caller (legend emission) is responsible for filtering empty-display lists.
         assert!(is_focus_list("Focus: "));
+    }
+
+    #[test]
+    fn test_focus_display_name_plain() {
+        assert_eq!(focus_display_name("Focus: In Production"), "In Production");
+    }
+
+    #[test]
+    fn test_focus_display_name_with_emoji() {
+        assert_eq!(
+            focus_display_name("🔥 Focus: In Production"),
+            "🔥 In Production"
+        );
+    }
+
+    #[test]
+    fn test_focus_display_name_bare_with_emoji() {
+        // After stripping, only "emoji + space" remains; trim() would yield empty.
+        assert_eq!(focus_display_name("🔥 Focus: "), "🔥 ");
+    }
+
+    #[test]
+    fn test_focus_display_name_bare_plain() {
+        assert_eq!(focus_display_name("Focus: "), "");
     }
 }
