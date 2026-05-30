@@ -1,11 +1,17 @@
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs;
+use std::time::Duration;
 
 use crate::config::Config;
 use crate::generator::llms_full;
 use crate::github::client::GitHubClient;
 use crate::github::readme;
+
+/// Throttle between README fetches to stay under GitHub's secondary rate
+/// limit (undocumented but ~80 req/min for content endpoints). 250ms gives
+/// ~240 req/min and burns ~3 minutes for 700 repos.
+const FETCH_INTERVAL: Duration = Duration::from_millis(250);
 
 pub async fn run(path: &str) -> Result<()> {
     let client = GitHubClient::new()?;
@@ -17,7 +23,7 @@ pub async fn run(path: &str) -> Result<()> {
     let all_starred = client.fetch_all_starred().await?;
 
     let total: usize = lists.iter().map(|l| l.repositories.len()).sum();
-    eprintln!("Fetching {total} READMEs (sequential)...");
+    eprintln!("Fetching {total} READMEs (throttled at {FETCH_INTERVAL:?})...");
 
     let http = reqwest::Client::new();
     let token = client.token().to_string();
@@ -36,6 +42,7 @@ pub async fn run(path: &str) -> Result<()> {
             if fetched.is_multiple_of(50) {
                 eprintln!("  {fetched}/{total}");
             }
+            tokio::time::sleep(FETCH_INTERVAL).await;
         }
     }
     eprintln!("  {fetched}/{total} (done)");
