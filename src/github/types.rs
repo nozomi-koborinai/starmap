@@ -103,6 +103,12 @@ pub struct RawRepository {
     pub name_with_owner: String,
     pub description: Option<String>,
     pub url: String,
+    /// True for private repositories. Filtered out before reaching domain
+    /// types so private repo names/contents never appear in published output.
+    /// Defaults to false to avoid silently dropping when the API omits the
+    /// field (shouldn't happen since we explicitly request it).
+    #[serde(default)]
+    pub is_private: bool,
     #[serde(default)]
     pub stargazer_count: Option<u64>,
     #[serde(default)]
@@ -168,6 +174,7 @@ impl From<RawUserList> for StarList {
                 .nodes
                 .into_iter()
                 .flatten()
+                .filter(|r| !r.is_private)
                 .map(Repository::from)
                 .collect(),
         }
@@ -202,6 +209,34 @@ mod tests {
         assert_eq!(repos.len(), 2);
         assert_eq!(repos[0].name_with_owner, "a/b");
         assert_eq!(repos[1].name_with_owner, "c/d");
+    }
+
+    /// Regression: private repos must be filtered out when converting
+    /// RawUserList to StarList so their names never reach the published
+    /// awesome list.
+    #[test]
+    fn star_list_drops_private_repos() {
+        let json = r#"{
+            "id": "L1",
+            "name": "Mixed",
+            "description": null,
+            "items": {
+                "nodes": [
+                    {"nameWithOwner": "public/a", "description": null, "url": "u", "isPrivate": false},
+                    {"nameWithOwner": "secret/b", "description": null, "url": "u", "isPrivate": true},
+                    {"nameWithOwner": "public/c", "description": null, "url": "u", "isPrivate": false}
+                ],
+                "pageInfo": {"hasNextPage": false, "endCursor": null}
+            }
+        }"#;
+        let raw: RawUserList = serde_json::from_str(json).unwrap();
+        let star_list: StarList = raw.into();
+        let names: Vec<_> = star_list
+            .repositories
+            .iter()
+            .map(|r| r.name_with_owner.as_str())
+            .collect();
+        assert_eq!(names, vec!["public/a", "public/c"]);
     }
 
     #[test]

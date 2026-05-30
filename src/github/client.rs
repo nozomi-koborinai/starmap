@@ -65,7 +65,13 @@ impl GitHubClient {
             let data: StarredQueryData = self.execute_query(&query).await?;
             let conn = data.viewer.starred_repositories;
 
-            repos.extend(conn.nodes.into_iter().flatten().map(Repository::from));
+            repos.extend(
+                conn.nodes
+                    .into_iter()
+                    .flatten()
+                    .filter(|r| !r.is_private)
+                    .map(Repository::from),
+            );
 
             if !conn.page_info.has_next_page {
                 break;
@@ -109,7 +115,13 @@ impl GitHubClient {
             let data: ListItemsQueryData = self.execute_query(&query).await?;
             let conn = data.node.items;
 
-            repos.extend(conn.nodes.into_iter().flatten().map(Repository::from));
+            repos.extend(
+                conn.nodes
+                    .into_iter()
+                    .flatten()
+                    .filter(|r| !r.is_private)
+                    .map(Repository::from),
+            );
 
             if !conn.page_info.has_next_page {
                 break;
@@ -209,6 +221,7 @@ fn build_lists_query(cursor: &Option<String>) -> String {
               nameWithOwner
               description
               url
+              isPrivate
             }}
           }}
           pageInfo {{ hasNextPage endCursor }}
@@ -231,6 +244,7 @@ fn build_starred_query(cursor: &Option<String>) -> String {
         nameWithOwner
         description
         url
+        isPrivate
         stargazerCount
         primaryLanguage {{ name }}
         repositoryTopics(first: 10) {{
