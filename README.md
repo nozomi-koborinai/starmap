@@ -2,6 +2,12 @@
 
 Generate Awesome Lists from your GitHub Stars, organized by [GitHub Lists](https://docs.github.com/en/get-started/exploring-projects-on-github/saving-repositories-with-stars#organizing-starred-repositories-with-lists).
 
+## When to use starmap
+
+starmap is for people who actively maintain GitHub Lists and want them mirrored as-is in a published Awesome List — no auto-grouping by language or topic, no algorithmic guessing. Your manual curation is the source of truth.
+
+If you don't use GitHub Lists, [maguowei/starred](https://github.com/maguowei/starred) is the mature, widely-used tool in this space and a better fit — it auto-categorizes your stars by language or topic out of the box.
+
 ## Install
 
 ```sh
