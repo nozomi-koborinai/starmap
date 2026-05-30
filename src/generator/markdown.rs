@@ -16,9 +16,9 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
     out.push_str("> A curated list of my GitHub stars, organized by lists.\n\n");
 
     // Partition: Focus Lists are tagged inline, topic lists become sections.
-    // `_focus_lists` is wired up in Task 6 (build_focus_index) and Task 7 (legend).
-    let (_focus_lists, topic_lists): (Vec<&StarList>, Vec<&StarList>) =
+    let (focus_lists, topic_lists): (Vec<&StarList>, Vec<&StarList>) =
         lists.iter().partition(|l| is_focus_list(&l.name));
+    let focus_index = build_focus_index(&focus_lists);
 
     // Uncategorized = repos that don't belong to any TOPIC list.
     // A repo that lives only in Focus Lists ends up here (with its Focus tags from Task 6).
@@ -64,7 +64,11 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
                 .cmp(&b.name_with_owner.to_lowercase())
         });
         for repo in &repos {
-            write_repo_line(&mut out, repo, &[]);
+            let tags = focus_index
+                .get(&repo.name_with_owner)
+                .cloned()
+                .unwrap_or_default();
+            write_repo_line(&mut out, repo, &tags);
         }
         out.push('\n');
     }
@@ -73,7 +77,11 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
     if !uncategorized.is_empty() {
         out.push_str("## Uncategorized\n\n");
         for repo in &uncategorized {
-            write_repo_line(&mut out, repo, &[]);
+            let tags = focus_index
+                .get(&repo.name_with_owner)
+                .cloned()
+                .unwrap_or_default();
+            write_repo_line(&mut out, repo, &tags);
         }
         out.push('\n');
     }
@@ -153,7 +161,6 @@ fn focus_display_name(name: &str) -> String {
 /// Tags appear in the order the Focus Lists are given in the input slice.
 /// Focus Lists with an empty display name (after `focus_display_name`) are silently
 /// skipped — the caller is responsible for surfacing a warning.
-#[allow(dead_code)]
 fn build_focus_index(focus_lists: &[&StarList]) -> HashMap<String, Vec<String>> {
     let mut index: HashMap<String, Vec<String>> = HashMap::new();
     for list in focus_lists {
@@ -371,6 +378,41 @@ mod tests {
             out,
             "- [a/b](https://github.com/a/b) - desc `🔥 In Production` `🌱 Watching`\n"
         );
+    }
+
+    #[test]
+    fn test_generate_tags_appear_on_repo_lines_in_topic_section() {
+        let lists = vec![
+            StarList {
+                name: "🤖 AI Frameworks".to_string(),
+                description: None,
+                repositories: vec![make_repo("a/b", Some("desc"))],
+            },
+            StarList {
+                name: "🔥 Focus: In Production".to_string(),
+                description: None,
+                repositories: vec![make_repo("a/b", None)],
+            },
+        ];
+        let md = generate(&lists, &[make_repo("a/b", Some("desc"))]);
+        assert!(md.contains("- [a/b](https://github.com/a/b) - desc `🔥 In Production`"));
+    }
+
+    #[test]
+    fn test_generate_tags_appear_on_uncategorized_repos() {
+        let lists = vec![StarList {
+            name: "🔥 Focus: In Production".to_string(),
+            description: None,
+            repositories: vec![make_repo("orphan/repo", None)],
+        }];
+        let all = vec![make_repo("orphan/repo", Some("orphan desc"))];
+        let md = generate(&lists, &all);
+
+        // orphan/repo is in a Focus List but no topic List → Uncategorized with tag
+        assert!(md.contains("## Uncategorized"));
+        assert!(md.contains(
+            "- [orphan/repo](https://github.com/orphan/repo) - orphan desc `🔥 In Production`"
+        ),);
     }
 
     #[test]
