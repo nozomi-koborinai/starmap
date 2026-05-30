@@ -56,6 +56,44 @@ export GITHUB_TOKEN="ghp_..."
 gh auth login
 ```
 
+## Sync via GitHub Actions
+
+To keep your published Awesome List in sync automatically, add this workflow to your **target repo** (e.g. `your-name/awesome-stars`) — not to the starmap repo:
+
+```yaml
+name: Update Awesome List
+on:
+  schedule:
+    - cron: '0 0 * * *'  # daily at 00:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install --git https://github.com/nozomi-koborinai/starmap
+      - run: starmap export README.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.STARMAP_PAT }}
+      - name: Commit if changed
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "starmap-bot"
+            git config user.email "bot@users.noreply.github.com"
+            git add README.md
+            git commit -m "chore: update Awesome List"
+            git push
+          fi
+```
+
+Add a classic Personal Access Token (with read access to your starred lists) as the `STARMAP_PAT` repo secret. The default `GITHUB_TOKEN` runs as `github-actions[bot]` and cannot see your stars.
+
 ## License
 
 MIT
