@@ -56,7 +56,9 @@ pub struct RawUserList {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListItemsConnection {
-    pub nodes: Vec<RawRepository>,
+    /// Entries are Option because GitHub returns null for repos the viewer
+    /// cannot access (private repos in restricted orgs, deleted repos, etc.).
+    pub nodes: Vec<Option<RawRepository>>,
     pub page_info: PageInfo,
 }
 
@@ -88,7 +90,8 @@ pub struct StarredViewer {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StarredConnection {
-    pub nodes: Vec<RawRepository>,
+    /// Entries are Option for the same reason as ListItemsConnection.nodes.
+    pub nodes: Vec<Option<RawRepository>>,
     pub page_info: PageInfo,
 }
 
@@ -160,7 +163,64 @@ impl From<RawUserList> for StarList {
         Self {
             name: raw.name,
             description: raw.description,
-            repositories: raw.items.nodes.into_iter().map(Repository::from).collect(),
+            repositories: raw
+                .items
+                .nodes
+                .into_iter()
+                .flatten()
+                .map(Repository::from)
+                .collect(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression test: GitHub returns null for repos the viewer cannot access
+    /// (private repos in restricted orgs, deleted repos). We must tolerate
+    /// nulls in nodes and skip them.
+    #[test]
+    fn list_items_connection_tolerates_null_nodes() {
+        let json = r#"{
+            "nodes": [
+                {"nameWithOwner": "a/b", "description": null, "url": "https://github.com/a/b"},
+                null,
+                {"nameWithOwner": "c/d", "description": "ok", "url": "https://github.com/c/d"}
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+        }"#;
+        let conn: ListItemsConnection = serde_json::from_str(json).unwrap();
+        assert_eq!(conn.nodes.len(), 3);
+        let repos: Vec<Repository> = conn
+            .nodes
+            .into_iter()
+            .flatten()
+            .map(Repository::from)
+            .collect();
+        assert_eq!(repos.len(), 2);
+        assert_eq!(repos[0].name_with_owner, "a/b");
+        assert_eq!(repos[1].name_with_owner, "c/d");
+    }
+
+    #[test]
+    fn starred_connection_tolerates_null_nodes() {
+        let json = r#"{
+            "nodes": [
+                null,
+                {"nameWithOwner": "a/b", "description": null, "url": "https://github.com/a/b"}
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+        }"#;
+        let conn: StarredConnection = serde_json::from_str(json).unwrap();
+        let repos: Vec<Repository> = conn
+            .nodes
+            .into_iter()
+            .flatten()
+            .map(Repository::from)
+            .collect();
+        assert_eq!(repos.len(), 1);
+        assert_eq!(repos[0].name_with_owner, "a/b");
     }
 }
