@@ -58,7 +58,7 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
                 .cmp(&b.name_with_owner.to_lowercase())
         });
         for repo in &repos {
-            write_repo_line(&mut out, repo);
+            write_repo_line(&mut out, repo, &[]);
         }
         out.push('\n');
     }
@@ -67,7 +67,7 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
     if !uncategorized.is_empty() {
         out.push_str("## Uncategorized\n\n");
         for repo in &uncategorized {
-            write_repo_line(&mut out, repo);
+            write_repo_line(&mut out, repo, &[]);
         }
         out.push('\n');
     }
@@ -75,15 +75,19 @@ pub fn generate(lists: &[StarList], all_starred: &[Repository]) -> String {
     out
 }
 
-fn write_repo_line(out: &mut String, repo: &Repository) {
+fn write_repo_line(out: &mut String, repo: &Repository, focus_tags: &[String]) {
     let desc = repo
         .description
         .as_deref()
         .unwrap_or("No description provided");
     out.push_str(&format!(
-        "- [{}]({}) - {}\n",
+        "- [{}]({}) - {}",
         repo.name_with_owner, repo.url, desc
     ));
+    for tag in focus_tags {
+        out.push_str(&format!(" `{tag}`"));
+    }
+    out.push('\n');
 }
 
 /// Convert a section name to a GitHub-compatible anchor
@@ -342,5 +346,25 @@ mod tests {
         };
         let index = build_focus_index(&[&f]);
         assert!(index.is_empty());
+    }
+
+    #[test]
+    fn test_write_repo_line_no_tags() {
+        let mut out = String::new();
+        let repo = make_repo("a/b", Some("desc"));
+        write_repo_line(&mut out, &repo, &[]);
+        assert_eq!(out, "- [a/b](https://github.com/a/b) - desc\n");
+    }
+
+    #[test]
+    fn test_write_repo_line_with_tags() {
+        let mut out = String::new();
+        let repo = make_repo("a/b", Some("desc"));
+        let tags = vec!["🔥 In Production".to_string(), "🌱 Watching".to_string()];
+        write_repo_line(&mut out, &repo, &tags);
+        assert_eq!(
+            out,
+            "- [a/b](https://github.com/a/b) - desc `🔥 In Production` `🌱 Watching`\n"
+        );
     }
 }
