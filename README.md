@@ -8,6 +8,16 @@ starmap is for people who actively maintain GitHub Lists and want them mirrored 
 
 If you don't use GitHub Lists, [maguowei/starred](https://github.com/maguowei/starred) is the mature, widely-used tool in this space and a better fit — it auto-categorizes your stars by language or topic out of the box.
 
+## Focus Lists
+
+Lists whose name starts with `Focus: ` (e.g. `🔥 Focus: In Production`, `🌱 Focus: Watching`) are rendered differently from topic lists:
+
+- They do **not** become Markdown sections
+- Each repo that belongs to a Focus List gets the Focus name appended as an inline tag (`` `🔥 In Production` ``)
+- A "Focus" legend at the top of the output explains each tag, using each Focus List's GitHub description
+
+Use Focus Lists to express orthogonal axes (e.g. "what I actually use" vs "what I'm watching") without disturbing your topic-based categorization.
+
 ## Install
 
 ```sh
