@@ -16,6 +16,13 @@ pub fn is_rate_limit_status(status: reqwest::StatusCode) -> bool {
     status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::TOO_MANY_REQUESTS
 }
 
+/// True for statuses worth retrying: rate limits plus transient server errors
+/// (500/502/503/504), which GitHub returns under load — e.g. a 504 Gateway
+/// Timeout on a heavy GraphQL query.
+pub fn is_retryable_status(status: reqwest::StatusCode) -> bool {
+    is_rate_limit_status(status) || status.is_server_error()
+}
+
 /// How long to wait before the next retry: honor the `Retry-After` header when
 /// GitHub provides one, otherwise fall back to exponential backoff.
 pub fn retry_delay(resp: &reqwest::Response, attempt: u32) -> Duration {
@@ -58,5 +65,20 @@ mod tests {
         assert!(is_rate_limit_status(reqwest::StatusCode::TOO_MANY_REQUESTS));
         assert!(!is_rate_limit_status(reqwest::StatusCode::OK));
         assert!(!is_rate_limit_status(reqwest::StatusCode::NOT_FOUND));
+    }
+
+    #[test]
+    fn retryable_statuses() {
+        // Rate limits and transient 5xx are retryable.
+        assert!(is_retryable_status(reqwest::StatusCode::FORBIDDEN));
+        assert!(is_retryable_status(reqwest::StatusCode::TOO_MANY_REQUESTS));
+        assert!(is_retryable_status(reqwest::StatusCode::BAD_GATEWAY));
+        assert!(is_retryable_status(
+            reqwest::StatusCode::SERVICE_UNAVAILABLE
+        ));
+        assert!(is_retryable_status(reqwest::StatusCode::GATEWAY_TIMEOUT));
+        // Success and ordinary client errors are not.
+        assert!(!is_retryable_status(reqwest::StatusCode::OK));
+        assert!(!is_retryable_status(reqwest::StatusCode::NOT_FOUND));
     }
 }

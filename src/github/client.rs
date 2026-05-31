@@ -155,10 +155,11 @@ impl GitHubClient {
 
             let status = resp.status();
 
-            if backoff::is_rate_limit_status(status) && attempt < backoff::MAX_RETRIES {
+            if backoff::is_retryable_status(status) && attempt < backoff::MAX_RETRIES {
                 let wait = backoff::retry_delay(&resp, attempt);
                 eprintln!(
-                    "  rate-limited on GraphQL request (attempt {}/{}); waiting {}s",
+                    "  retrying GraphQL request after {} (attempt {}/{}); waiting {}s",
+                    status,
                     attempt + 1,
                     backoff::MAX_RETRIES,
                     wait.as_secs()

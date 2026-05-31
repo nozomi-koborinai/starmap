@@ -30,12 +30,13 @@ pub async fn fetch_readme(
             return Ok(None);
         }
 
-        // Retry GitHub's rate-limit responses (403 secondary / 429 primary)
-        // with backoff.
-        if backoff::is_rate_limit_status(resp.status()) && attempt < backoff::MAX_RETRIES {
+        // Retry rate limits (403/429) and transient server errors (5xx) with
+        // backoff.
+        if backoff::is_retryable_status(resp.status()) && attempt < backoff::MAX_RETRIES {
             let wait = backoff::retry_delay(&resp, attempt);
             eprintln!(
-                "  rate-limited on {owner}/{name} (attempt {}/{}); waiting {}s",
+                "  retrying {owner}/{name} after {} (attempt {}/{}); waiting {}s",
+                resp.status(),
                 attempt + 1,
                 backoff::MAX_RETRIES,
                 wait.as_secs()
