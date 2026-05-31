@@ -3,6 +3,7 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use std::process::Command;
 
+use super::backoff;
 use super::types::*;
 
 const GRAPHQL_ENDPOINT: &str = "https://api.github.com/graphql";
@@ -132,27 +133,48 @@ impl GitHubClient {
         Ok(repos)
     }
 
-    /// Execute a GraphQL query and deserialize the response
+    /// Execute a GraphQL query and deserialize the response.
+    ///
+    /// GraphQL shares GitHub's rate limits, so a 403 (secondary) / 429
+    /// (primary) is retried with backoff rather than aborting the whole run —
+    /// the same treatment the REST README fetcher gets.
     async fn execute_query<T: serde::de::DeserializeOwned>(&self, query: &str) -> Result<T> {
         let body = json!({ "query": query });
 
-        let resp = self
-            .http
-            .post(GRAPHQL_ENDPOINT)
-            .bearer_auth(&self.token)
-            .header("User-Agent", "starmap-cli")
-            .json(&body)
-            .send()
-            .await
-            .context("Failed to send GraphQL request")?;
+        let mut attempt: u32 = 0;
+        let json: Value = loop {
+            let resp = self
+                .http
+                .post(GRAPHQL_ENDPOINT)
+                .bearer_auth(&self.token)
+                .header("User-Agent", "starmap-cli")
+                .json(&body)
+                .send()
+                .await
+                .context("Failed to send GraphQL request")?;
 
-        let status = resp.status();
-        if !status.is_success() {
-            let text = resp.text().await.unwrap_or_default();
-            bail!("GitHub API returned {status}: {text}");
-        }
+            let status = resp.status();
 
-        let json: Value = resp.json().await.context("Failed to parse response JSON")?;
+            if backoff::is_rate_limit_status(status) && attempt < backoff::MAX_RETRIES {
+                let wait = backoff::retry_delay(&resp, attempt);
+                eprintln!(
+                    "  rate-limited on GraphQL request (attempt {}/{}); waiting {}s",
+                    attempt + 1,
+                    backoff::MAX_RETRIES,
+                    wait.as_secs()
+                );
+                tokio::time::sleep(wait).await;
+                attempt += 1;
+                continue;
+            }
+
+            if !status.is_success() {
+                let text = resp.text().await.unwrap_or_default();
+                bail!("GitHub API returned {status}: {text}");
+            }
+
+            break resp.json().await.context("Failed to parse response JSON")?;
+        };
 
         if let Some(errors) = json.get("errors") {
             bail!("GraphQL errors: {errors}");
