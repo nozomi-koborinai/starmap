@@ -94,7 +94,7 @@ To keep your published Awesome List in sync automatically, add this workflow to 
 name: Update Awesome List
 on:
   schedule:
-    - cron: '0 0 * * *'  # daily at 00:00 UTC
+    - cron: '0 1 * * *'  # daily at 01:00 UTC
   workflow_dispatch:
 
 permissions:
