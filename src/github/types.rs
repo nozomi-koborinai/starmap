@@ -40,13 +40,25 @@ pub struct ListsViewer {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListsConnection {
-    pub nodes: Vec<RawUserList>,
+    pub nodes: Vec<RawUserListMeta>,
     pub page_info: PageInfo,
+}
+
+/// List metadata returned by the paginated `viewer.lists` query.
+/// Items are fetched separately per list to stay within GitHub's GraphQL
+/// resource limits (nested list+items queries hit RESOURCE_LIMITS_EXCEEDED).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawUserListMeta {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawUserList {
+    #[allow(dead_code)]
     pub id: String,
     pub name: String,
     pub description: Option<String>,
