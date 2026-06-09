@@ -106,7 +106,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
       - run: cargo install --git https://github.com/nozomi-koborinai/starmap
       - run: starmap export README.md
         env:

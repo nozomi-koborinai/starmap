@@ -8,6 +8,10 @@ use super::types::*;
 
 const GRAPHQL_ENDPOINT: &str = "https://api.github.com/graphql";
 
+/// Page size for list-item pagination. Kept moderate so a single list query
+/// stays under GitHub's GraphQL resource/complexity limits.
+const LIST_ITEMS_PAGE_SIZE: u32 = 50;
+
 pub struct GitHubClient {
     http: Client,
     token: String,
@@ -31,20 +35,12 @@ impl GitHubClient {
             let conn = data.viewer.lists;
 
             for raw_list in conn.nodes {
-                let mut star_list = StarList::from(raw_list.clone());
-
-                // Fetch remaining pages if items are paginated
-                if raw_list.items.page_info.has_next_page {
-                    let remaining = self
-                        .fetch_remaining_list_items(
-                            &raw_list.id,
-                            raw_list.items.page_info.end_cursor,
-                        )
-                        .await?;
-                    star_list.repositories.extend(remaining);
-                }
-
-                lists.push(star_list);
+                let repositories = self.fetch_list_items(&raw_list.id).await?;
+                lists.push(StarList {
+                    name: raw_list.name,
+                    description: raw_list.description,
+                    repositories,
+                });
             }
 
             if !conn.page_info.has_next_page {
@@ -102,14 +98,10 @@ impl GitHubClient {
         Ok(data.viewer.login)
     }
 
-    /// Fetch remaining pages of items within a list
-    async fn fetch_remaining_list_items(
-        &self,
-        list_id: &str,
-        start_cursor: Option<String>,
-    ) -> Result<Vec<Repository>> {
+    /// Fetch all items within a list, paginating as needed.
+    async fn fetch_list_items(&self, list_id: &str) -> Result<Vec<Repository>> {
         let mut repos = Vec::new();
-        let mut cursor = start_cursor;
+        let mut cursor: Option<String> = None;
 
         loop {
             let query = build_list_items_query(list_id, &cursor);
@@ -236,19 +228,6 @@ fn build_lists_query(cursor: &Option<String>) -> String {
         id
         name
         description
-        isPrivate
-        items(first: 100) {{
-          totalCount
-          nodes {{
-            ... on Repository {{
-              nameWithOwner
-              description
-              url
-              isPrivate
-            }}
-          }}
-          pageInfo {{ hasNextPage endCursor }}
-        }}
       }}
       pageInfo {{ hasNextPage endCursor }}
     }}
@@ -287,13 +266,14 @@ fn build_list_items_query(list_id: &str, cursor: &Option<String>) -> String {
         r#"{{
   node(id: "{list_id}") {{
     ... on UserList {{
-      items(first: 100{after}) {{
+      items(first: {LIST_ITEMS_PAGE_SIZE}{after}) {{
         totalCount
         nodes {{
           ... on Repository {{
             nameWithOwner
             description
             url
+            isPrivate
           }}
         }}
         pageInfo {{ hasNextPage endCursor }}
@@ -308,5 +288,24 @@ fn cursor_arg(cursor: &Option<String>) -> String {
     match cursor {
         Some(c) => format!(", after: \"{c}\""),
         None => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod query_tests {
+    use super::*;
+
+    #[test]
+    fn lists_query_fetches_metadata_only() {
+        let query = build_lists_query(&None);
+        assert!(query.contains("lists(first: 100"));
+        assert!(!query.contains("items("));
+    }
+
+    #[test]
+    fn list_items_query_paginates_with_private_flag() {
+        let query = build_list_items_query("LIST_ID", &None);
+        assert!(query.contains(&format!("items(first: {LIST_ITEMS_PAGE_SIZE})")));
+        assert!(query.contains("isPrivate"));
     }
 }
